@@ -1,0 +1,28 @@
+AWS S3 SETUP REQUIRED
+
+S3 Bucket: recommendation-system-1149
+
+Required S3 Paths (Create these before running pipeline):
+1. s3://recommendation-system-1149/raw-data/sample_data/
+   - articles.parquet
+   - customers.parquet
+   - transactions.parquet
+
+2. s3://recommendation-system-1149/raw-data/main_data/
+   - articles.parquet
+   - customers.parquet
+   - transactions.parquet
+
+3. s3://recommendation-system-1149/features/sample/ranking_model/
+4. s3://recommendation-system-1149/features/sample/two_tower_model/
+5. s3://recommendation-system-1149/features/main/ranking_model/
+6. s3://recommendation-system-1149/features/main/two_tower_model/
+
+AWS Credentials:
+- Configure AWS CLI: aws configure
+- Or set environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+- Region: Ensure bucket is accessible from your AWS profile
+
+Running Pipeline:
+python -m pipeline.pipeline --mode test
+python -m pipeline.pipeline --mode prod
