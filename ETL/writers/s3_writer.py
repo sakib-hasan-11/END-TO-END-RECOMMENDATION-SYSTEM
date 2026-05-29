@@ -42,15 +42,15 @@ class DataWriter:
             raise
 
     def write_features(
-        self, df: DataFrame, feature_type: str, name: str = "features"
-    ) -> None:
+        self, df: DataFrame, feature_type: str) -> None:
         try:
             if self.test:
-                output_path = f"s3://recommendation-system-1149/features/sample/{feature_type}/{name}.parquet"
+                output_path = f"s3://recommendation-system-1149/features/sample/{feature_type}"
             else:
-                output_path = f"s3://recommendation-system-1149/features/main/{feature_type}/{name}.parquet"
+                output_path = f"s3://recommendation-system-1149/features/main/{feature_type}"
             df.write.mode("overwrite").parquet(output_path)
             logger.info(f"Features written: {df.count()} records")
+            logger.info(f"Successfully written to {output_path}")
         except Exception as e:
             logger.error(f"Error writing features: {str(e)}")
             raise

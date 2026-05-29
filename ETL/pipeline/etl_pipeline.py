@@ -124,6 +124,21 @@ class ETLPipeline:
                 customers, articles, transactions
             )
 
+            logger.info("Writing ranking features...")
+            self.writer.write_features(
+                ranking_df,
+                feature_type="ranking"
+            )
+
+            logger.info("Writing two tower features...")
+            self.writer.write_features(
+                two_tower_df,
+                feature_type="two_tower"
+            )
+
+
+            logger.info("All writes verified")
+
             end_time = datetime.now()
             duration = end_time - self.start_time
             logger.info(f"Pipeline completed successfully. Duration: {duration}")
