@@ -50,17 +50,6 @@ def build_two_tower_features(transactions, customers, articles, test: bool = Fal
             .join(color_affinity, on="customer_id", how="left")
         )
 
-        if test:
-            output_path = (
-                "s3://recommendation-system-1149/features/sample/two_tower_model/"
-            )
-        else:
-            output_path = (
-                "s3://recommendation-system-1149/features/main/two_tower_model/"
-            )
-
-        final_df.write.mode("overwrite").parquet(output_path)
-        logger.info(f"Two-tower features written to S3: {final_df.count()} records")
 
         return final_df
 

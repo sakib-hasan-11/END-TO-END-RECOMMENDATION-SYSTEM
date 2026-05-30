@@ -66,16 +66,6 @@ def build_ranking_features(transactions, customers, articles, test: bool = False
 
         ranking_df = ranking_df.withColumn("label", F.lit(1))
 
-        if test:
-            output_path = (
-                "s3://recommendation-system-1149/features/sample/ranking_model/"
-            )
-        else:
-            output_path = "s3://recommendation-system-1149/features/main/ranking_model/"
-
-        ranking_df.write.mode("overwrite").parquet(output_path)
-        logger.info(f"Ranking features written to S3: {ranking_df.count()} records")
-
         return ranking_df
 
     except Exception as e:

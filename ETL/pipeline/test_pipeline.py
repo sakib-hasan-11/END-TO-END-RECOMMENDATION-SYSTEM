@@ -18,7 +18,7 @@ from logs import logger
 
 class ETLPipeline:
     def __init__(
-        self, test: bool = False, app_name: str = "recommendation-etl-pipeline"
+        self, test: bool = True, app_name: str = "recommendation-etl-pipeline"
     ):
         self.test = test
         self.app_name = app_name
@@ -43,7 +43,9 @@ class ETLPipeline:
 
     def read_data(self) -> Tuple[DataFrame, DataFrame, DataFrame]:
         try:
+            logger.info("*" * 50)
             logger.info("Reading raw data from S3")
+            logger.info("*" * 50)
             articles, customers, transactions = self.reader.read_all(self.spark)
 
             if (
@@ -65,7 +67,9 @@ class ETLPipeline:
         self, customers: DataFrame, articles: DataFrame, transactions: DataFrame
     ) -> Tuple[DataFrame, DataFrame, DataFrame]:
         try:
+            logger.info("*" * 50)
             logger.info("Preprocessing data")
+            logger.info("*" * 50)
             customers, articles, transactions = preprocess(
                 customers=customers,
                 articles=articles,
@@ -82,7 +86,9 @@ class ETLPipeline:
         self, customers: DataFrame, articles: DataFrame, transactions: DataFrame
     ) -> DataFrame:
         try:
+            logger.info("*" * 50)
             logger.info("Building ranking model features")
+            logger.info("*" * 50)
             ranking_df = build_ranking_features(
                 transactions=transactions,
                 customers=customers,
@@ -99,7 +105,9 @@ class ETLPipeline:
         self, customers: DataFrame, articles: DataFrame, transactions: DataFrame
     ) -> DataFrame:
         try:
+            logger.info("*" * 50)
             logger.info("Building two-tower model features")
+            logger.info("*" * 50)
             two_tower_df = build_two_tower_features(
                 transactions=transactions,
                 customers=customers,
@@ -123,21 +131,14 @@ class ETLPipeline:
             two_tower_df = self.build_two_tower_features(
                 customers, articles, transactions
             )
-
+            logger.info("*" * 50)
             logger.info("Writing ranking features...")
-            self.writer.write_features(
-                ranking_df,
-                feature_type="ranking"
-            )
-
+            logger.info("*" * 50)
+            self.writer.write_features(ranking_df, feature_type="ranking")
+            logger.info("*" * 50)
             logger.info("Writing two tower features...")
-            self.writer.write_features(
-                two_tower_df,
-                feature_type="two_tower"
-            )
-
-
-            logger.info("All writes verified")
+            logger.info("*" * 50)
+            self.writer.write_features(two_tower_df, feature_type="two_tower")
 
             end_time = datetime.now()
             duration = end_time - self.start_time
@@ -153,7 +154,7 @@ class ETLPipeline:
             raise
 
 
-def main(test: bool = False):
+def main(test: bool = True):
     try:
         pipeline = ETLPipeline(test=test)
         pipeline.run()

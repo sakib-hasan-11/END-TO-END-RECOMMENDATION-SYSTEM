@@ -7,9 +7,9 @@ class DataReader:
     def __init__(self, test: bool = False):
         self.test = test
         if test:
-            self.BASE_PATH = "s3://recommendation-system-1149/raw-data/sample_data"
+            self.BASE_PATH = "s3://recommendation-system-1149/raw-data/sample_data/"
         else:
-            self.BASE_PATH = "s3://recommendation-system-1149/raw-data/main_data"
+            self.BASE_PATH = "s3://recommendation-system-1149/raw-data/main_data/"
         logger.info(f"DataReader initialized: {self.BASE_PATH}")
 
     def read_articles(self, spark: SparkSession) -> DataFrame:

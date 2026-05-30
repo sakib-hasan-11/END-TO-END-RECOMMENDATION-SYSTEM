@@ -8,11 +8,16 @@ class DataWriter:
         self.test = test
         if test:
             self.BASE_PATH = (
-                "s3://recommendation-system-1149/processed-data/sample_data"
+                "s3://recommendation-system-1149/processed-data/sample_data/"
             )
         else:
-            self.BASE_PATH = "s3://recommendation-system-1149/processed-data/main_data"
+            self.BASE_PATH = "s3://recommendation-system-1149/processed-data/main_data/"
         logger.info(f"DataWriter initialized: {self.BASE_PATH}")
+
+        logger.info("=" * 100)
+        logger.info(f"DataWriter test flag = {self.test}")
+        logger.info(f"Base path = {self.BASE_PATH}")
+        logger.info("=" * 100)
 
     def write_articles(self, df: DataFrame, name: str = "articles") -> None:
         try:
@@ -45,9 +50,9 @@ class DataWriter:
         self, df: DataFrame, feature_type: str) -> None:
         try:
             if self.test:
-                output_path = f"s3://recommendation-system-1149/features/sample/{feature_type}"
+                output_path = f"s3://recommendation-system-1149/features/sample/{feature_type}/"
             else:
-                output_path = f"s3://recommendation-system-1149/features/main/{feature_type}"
+                output_path = f"s3://recommendation-system-1149/features/main/{feature_type}/"
             df.write.mode("overwrite").parquet(output_path)
             logger.info(f"Features written: {df.count()} records")
             logger.info(f"Successfully written to {output_path}")
