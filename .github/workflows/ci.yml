@@ -132,7 +132,7 @@ jobs:
           REPOSITORY: ${{ env.ECR_REPO_NAME }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          IMAGE_URI="${{ env.REGISTRY }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          IMAGE_URI="${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.IMAGE_NAME }}-${{ env.IMAGE_TAG }}"
           
           echo " Building Docker image..."
           echo " Image URI: ${IMAGE_URI}"
@@ -140,7 +140,7 @@ jobs:
           docker build \
             -f imge_embed.Dockerfile \
             -t ${IMAGE_URI} \
-            -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.IMAGE_NAME }}-${{ github.sha }} \
             .
           
           echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
@@ -160,7 +160,7 @@ jobs:
           echo " Image pushed: ${{ env.IMAGE_URI }}"
           
           # Also push with commit SHA tag
-          docker push ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${{ env.IMAGE_NAME }}-${{ github.sha }}
           
           echo " Image pushed with commit SHA tag"
       
@@ -177,7 +177,7 @@ jobs:
           echo " ECR Repository: ${{ env.ECR_REPO_NAME }}"
           echo "  Image Name: ${{ env.IMAGE_NAME }}"
           echo " Latest Tag: ${{ env.IMAGE_URI }}"
-          echo " Commit Tag: ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo " Commit Tag: ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:${{ env.IMAGE_NAME }}-${{ github.sha }}"
           echo ""
           echo "To use this image:"
           echo "   docker run ${{ env.IMAGE_URI }}"
