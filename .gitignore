@@ -2,7 +2,7 @@
 __pycache__/
 *.py[codz]
 *$py.class
-
+EMR_commands.sh
 # C extensions
 *.so
 real_world_case/

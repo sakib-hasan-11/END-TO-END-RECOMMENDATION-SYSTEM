@@ -1,0 +1,10 @@
+torch 
+torchvision 
+transformers==4.41.2 
+pillow 
+pandas 
+pyarrow 
+boto3 
+s3fs 
+tqdm
+omegaconf

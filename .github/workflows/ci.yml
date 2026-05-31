@@ -1,0 +1,232 @@
+name: Build and Push Embedding Pipeline to ECR
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'image_embedding_pipeline/**'
+      - 'config/**'
+      - 'imge_embed.Dockerfile'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+    
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPO_NAME: recommendation-system
+      IMAGE_NAME: embedding-pipeline
+      IMAGE_TAG: latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Step 2: Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      # Step 3: Get AWS account ID
+      - name: Get AWS Account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+          echo " AWS Account ID: ${ACCOUNT_ID}"
+      
+      # Step 4: Check if ECR repository exists
+      - name: Check if ECR repository exists
+        id: ecr-check
+        run: |
+          if aws ecr describe-repositories \
+            --repository-names ${{ env.ECR_REPO_NAME }} \
+            --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            echo "repo_exists=true" >> $GITHUB_OUTPUT
+            echo " ECR repository '${{ env.ECR_REPO_NAME }}' exists"
+          else
+            echo "repo_exists=false" >> $GITHUB_OUTPUT
+            echo "ℹ ECR repository '${{ env.ECR_REPO_NAME }}' does not exist"
+          fi
+      
+      # Step 5: Delete existing ECR repository if it exists
+      - name: Delete existing ECR repository
+        if: steps.ecr-check.outputs.repo_exists == 'true'
+        run: |
+          echo "  Deleting existing ECR repository '${{ env.ECR_REPO_NAME }}'..."
+          aws ecr delete-repository \
+            --repository-name ${{ env.ECR_REPO_NAME }} \
+            --force \
+            --region ${{ env.AWS_REGION }}
+          echo "✓ Repository deleted successfully"
+          sleep 5  # Wait for deletion to complete
+      
+      # Step 6: Create new ECR repository
+      - name: Create ECR repository
+        id: create-repo
+        run: |
+          echo " Creating new ECR repository '${{ env.ECR_REPO_NAME }}'..."
+          REPO_URI=$(aws ecr create-repository \
+            --repository-name ${{ env.ECR_REPO_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'repository.repositoryUri' \
+            --output text)
+          
+          echo "repo_uri=${REPO_URI}" >> $GITHUB_OUTPUT
+          echo "✓ Repository created: ${REPO_URI}"
+          
+          # Set lifecycle policy to keep only last 10 images
+          aws ecr put-lifecycle-policy \
+            --repository-name ${{ env.ECR_REPO_NAME }} \
+            --lifecycle-policy-text '{
+              "rules": [
+                {
+                  "rulePriority": 1,
+                  "description": "Keep last 10 images",
+                  "selection": {
+                    "tagStatus": "any",
+                    "countType": "imageCountMoreThan",
+                    "countNumber": 10
+                  },
+                  "action": {
+                    "type": "expire"
+                  }
+                }
+              ]
+            }' \
+            --region ${{ env.AWS_REGION }}
+          
+          echo " Lifecycle policy configured"
+      
+      # Step 7: Get ECR login token and login to Docker
+      - name: Login to Amazon ECR
+        id: login-ecr
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin \
+            ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          
+          echo " Successfully logged in to ECR"
+      
+      # Step 8: Build Docker image
+      - name: Build Docker image
+        id: docker-build
+        env:
+          REGISTRY: ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          REPOSITORY: ${{ env.ECR_REPO_NAME }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          IMAGE_URI="${{ env.REGISTRY }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          
+          echo " Building Docker image..."
+          echo " Image URI: ${IMAGE_URI}"
+          
+          docker build \
+            -f imge_embed.Dockerfile \
+            -t ${IMAGE_URI} \
+            -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            .
+          
+          echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+          echo " Docker image built successfully"
+          
+          # Show image info
+          docker images | grep ${{ env.IMAGE_NAME }}
+      
+      # Step 9: Push image to ECR
+      - name: Push Docker image to ECR
+        env:
+          IMAGE_URI: ${{ steps.docker-build.outputs.image_uri }}
+        run: |
+          echo " Pushing Docker image to ECR..."
+          docker push ${{ env.IMAGE_URI }}
+          
+          echo " Image pushed: ${{ env.IMAGE_URI }}"
+          
+          # Also push with commit SHA tag
+          docker push ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          
+          echo " Image pushed with commit SHA tag"
+      
+      # Step 10: Output summary
+      - name: Print deployment summary
+        env:
+          IMAGE_URI: ${{ steps.docker-build.outputs.image_uri }}
+        run: |
+          echo ""
+          echo "=================================================="
+          echo " Deployment Successful!"
+          echo "=================================================="
+          echo ""
+          echo " ECR Repository: ${{ env.ECR_REPO_NAME }}"
+          echo "  Image Name: ${{ env.IMAGE_NAME }}"
+          echo " Latest Tag: ${{ env.IMAGE_URI }}"
+          echo " Commit Tag: ${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo ""
+          echo "To use this image:"
+          echo "   docker run ${{ env.IMAGE_URI }}"
+          echo "   docker run ${{ env.IMAGE_URI }} python src/run.py prod"
+          echo ""
+          echo "ECR Console: https://console.aws.amazon.com/ecr/repositories/${{ env.ECR_REPO_NAME }}"
+          echo "=================================================="
+          echo ""
+      
+      # Step 11: Create deployment annotation (optional)
+      - name: Create deployment annotation
+        if: success()
+        run: |
+          echo "###  Image Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ env.ECR_REPO_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Name:** ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "- \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Status:** Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View in ECR](https://console.aws.amazon.com/ecr/repositories/${{ env.ECR_REPO_NAME }})" >> $GITHUB_STEP_SUMMARY
+
+  # Optional: Scan image for vulnerabilities
+  scan-image:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: success()
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Scan image for vulnerabilities
+        run: |
+          echo "Starting ECR image vulnerability scan..."
+          
+          aws ecr start-image-scan \
+            --repository-name recommendation-system \
+            --image-id imageTag=latest \
+            --region us-east-1
+          
+          echo "Vulnerability scan initiated"
+          echo "Check ECR console for detailed scan results"
