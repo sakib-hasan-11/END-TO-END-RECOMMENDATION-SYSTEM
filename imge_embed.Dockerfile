@@ -27,7 +27,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Default command to run the pipeline in test mode
 # Can be overridden with: docker run ... python src/run.py prod
-CMD ["python", "src/run.py", "test"]
+CMD ["python", "src/run.py", "prod"]
 
-# Uncomment the line below to run in PRODUCTION mode instead of test
-# CMD ["python", "src/run.py", "prod"]
