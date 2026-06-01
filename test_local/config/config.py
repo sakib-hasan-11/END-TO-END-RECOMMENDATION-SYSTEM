@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 @dataclass
 class PipelineConfig:
-
     mode: str
 
     bucket: str
@@ -20,7 +19,7 @@ class PipelineConfig:
 
     batch_size: int
 
-    gpu_batch: int
+    gpu_image_batch: int
 
 
 TEST_CONFIG = PipelineConfig(
@@ -32,7 +31,7 @@ TEST_CONFIG = PipelineConfig(
     local_image_dir="/tmp/images",
     local_output_dir="/tmp/output",
     batch_size=100,
-    gpu_batch=32
+    gpu_image_batch=64,
 )
 
 PROD_CONFIG = PipelineConfig(
@@ -44,5 +43,5 @@ PROD_CONFIG = PipelineConfig(
     local_image_dir="/tmp/images",
     local_output_dir="/tmp/output",
     batch_size=1000,
-    gpu_batch=64
+    gpu_image_batch=128,
 )

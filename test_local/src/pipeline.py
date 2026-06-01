@@ -89,25 +89,28 @@ class EmbeddingPipeline:
 
                         # Process batch in GPU batches
                         total_gpu_batches = (
-                            len(batch) + self.config.gpu_batch - 1
-                        ) // self.config.gpu_batch
-                        
+                            len(batch) + self.config.gpu_image_batch - 1
+                        ) // self.config.gpu_image_batch
+
                         for gpu_batch_id, gpu_batch_start in enumerate(
-                            range(0, len(batch), self.config.gpu_batch)
+                            range(0, len(batch), self.config.gpu_image_batch)
                         ):
                             gpu_batch = batch[
-                                gpu_batch_start : gpu_batch_start + self.config.gpu_batch
+                                gpu_batch_start : gpu_batch_start
+                                + self.config.gpu_image_batch
                             ]
-                            
+
                             logger.debug(
                                 f"Processing GPU batch {gpu_batch_id + 1}/{total_gpu_batches} with {len(gpu_batch)} images"
                             )
-                            
+
                             try:
-                                embeddings, valid_paths = self.embedder.generate_batch_embeddings(
-                                    [str(img_path) for img_path in gpu_batch]
+                                embeddings, valid_paths = (
+                                    self.embedder.generate_batch_embeddings(
+                                        [str(img_path) for img_path in gpu_batch]
+                                    )
                                 )
-                                
+
                                 for img_path, embedding in zip(valid_paths, embeddings):
                                     article_id = Path(img_path).stem
                                     records.append(
@@ -117,9 +120,9 @@ class EmbeddingPipeline:
                                             "event_timestamp": datetime.utcnow(),
                                         }
                                     )
-                                
+
                                 failed_images += len(gpu_batch) - len(valid_paths)
-                                
+
                             except Exception as e:
                                 logger.warning(
                                     f"Failed to process GPU batch {gpu_batch_id + 1}: {str(e)}"
