@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # Copy requirements file and install dependencies
-COPY image_embedding_pipeline/requirements.txt ./requirements.txt
+COPY image_embeding_pipeline/requirements.txt ./requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt && \
     rm requirements.txt
