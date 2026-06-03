@@ -11,10 +11,9 @@ class ProdConfig(BaseConfig):
             aws_region="us-east-1",
 
             s3_bucket="recommendation-system-1149",
-
-            ranking_input_path="features/prod/ranking",
-            two_tower_input_path="features/prod/two_tower",
-            embeddings_input_path="features/prod/embeddings",
+            ranking_input_path="features/main/ranking",
+            two_tower_input_path="features/main/two_tower",
+            embeddings_input_path="features/main/embeddings",
 
             output_root_path="processed/prod",
 
