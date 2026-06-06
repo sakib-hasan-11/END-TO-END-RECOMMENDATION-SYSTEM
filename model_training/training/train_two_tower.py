@@ -1,5 +1,8 @@
 import os
+import tempfile
+from pathlib import Path
 
+import boto3
 from common.s3_reader import S3Reader
 from configs import get_config
 from data.loaders import DataLoader
@@ -99,6 +102,41 @@ class TwoTowerTrainer:
             color_vocab=artifacts.favorite_color_vocab,
         )
 
+    def save_model_to_s3(
+        self,
+        model,
+    ):
+        bucket = "recommendation-system-1149"
+
+        prefix = f"model_artifacts/{self.config.environment}/two_tower"
+
+        s3 = boto3.client("s3")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            keras_path = Path(tmp_dir) / "two_tower_model.keras"
+
+            model.save(keras_path)
+
+            s3.upload_file(
+                str(keras_path),
+                bucket,
+                f"{prefix}/two_tower_model.keras",
+            )
+
+            saved_model_path = Path(tmp_dir) / "saved_model"
+
+            model.export(str(saved_model_path))
+
+            for file in saved_model_path.rglob("*"):
+                if file.is_file():
+                    s3.upload_file(
+                        str(file),
+                        bucket,
+                        f"{prefix}/saved_model/{file.relative_to(saved_model_path)}",
+                    )
+
+        print(f"Saved model to s3://{bucket}/{prefix}")
+
     def train(self):
         self.setup_device()
 
@@ -145,9 +183,13 @@ class TwoTowerTrainer:
 
         history = model.fit(
             dataset,
-            epochs=1,
+            epochs=5,  # for test only 5
             verbose=1,
         )
+
+        tracker.log_tensorflow_model(model)
+
+        self.save_model_to_s3(model)
 
         metrics = {
             "final_loss": float(history.history["loss"][-1]),
@@ -161,3 +203,15 @@ class TwoTowerTrainer:
         tracker.end_run()
 
         return history
+
+
+def main():
+    trainer = TwoTowerTrainer(
+        environment="prod"  # set "test" for testing
+    )
+
+    trainer.train()
+
+
+if __name__ == "__main__":
+    main()

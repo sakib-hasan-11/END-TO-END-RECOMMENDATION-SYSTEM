@@ -2,6 +2,11 @@ import os
 
 os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
+import pickle
+import tempfile
+from pathlib import Path
+
+import boto3
 import tensorflow as tf
 from common.s3_reader import S3Reader
 from configs import get_config
@@ -90,15 +95,84 @@ class RankingTrainer:
             negative_ratio=3,
         )
 
+        print(f"Training Rows: {len(ranking_df):,}")
+
+        print(ranking_df["label"].value_counts(normalize=True))
+
         dataset = ranking_builder.build_tf_dataset(
             ranking_df,
             batch_size=256,
         )
 
-        return dataset
+        return dataset, ranking_df
 
     def build_model(self):
         return RankingModel()
+
+    def save_lookup_artifacts_to_s3(
+        self,
+        artifacts,
+    ):
+        bucket = "recommendation-system-1149"
+
+        prefix = f"model_artifacts/{self.config.environment}/lookups"
+
+        s3 = boto3.client("s3")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            artifact_path = Path(tmp_dir) / "lookup_artifacts.pkl"
+
+            with open(
+                artifact_path,
+                "wb",
+            ) as f:
+                pickle.dump(
+                    artifacts,
+                    f,
+                )
+
+            s3.upload_file(
+                str(artifact_path),
+                bucket,
+                f"{prefix}/lookup_artifacts.pkl",
+            )
+
+        print(f"Saved lookups to s3://{bucket}/{prefix}")
+
+    def save_model_to_s3(
+        self,
+        model,
+    ):
+        bucket = "recommendation-system-1149"
+
+        prefix = f"model_artifacts/{self.config.environment}/ranking"
+
+        s3 = boto3.client("s3")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            keras_path = Path(tmp_dir) / "ranking_model.keras"
+
+            model.save(keras_path)
+
+            s3.upload_file(
+                str(keras_path),
+                bucket,
+                f"{prefix}/ranking_model.keras",
+            )
+
+            saved_model_path = Path(tmp_dir) / "saved_model"
+
+            model.export(str(saved_model_path))
+
+            for file in saved_model_path.rglob("*"):
+                if file.is_file():
+                    s3.upload_file(
+                        str(file),
+                        bucket,
+                        f"{prefix}/saved_model/{file.relative_to(saved_model_path)}",
+                    )
+
+        print(f"Saved model to s3://{bucket}/{prefix}")
 
     def train(self):
         self.setup_device()
@@ -116,7 +190,7 @@ class RankingTrainer:
             embedding_table,
         )
 
-        dataset = self.build_dataset(
+        dataset, ranking_df = self.build_dataset(
             interactions_df,
             artifacts,
         )
@@ -140,7 +214,7 @@ class RankingTrainer:
 
         history = model.fit(
             dataset,
-            epochs=1,
+            epochs=5,
             verbose=1,
         )
 
@@ -148,16 +222,20 @@ class RankingTrainer:
             {
                 "environment": self.config.environment,
                 "batch_size": 256,
-                "epochs": 1,
+                "epochs": 5,
                 "learning_rate": 1e-3,
             }
         )
 
-        tracker.log_metrics(
+        tracker.log_params(
             {
-                "final_loss": float(history.history["loss"][-1]),
-                "final_auc": float(history.history["auc"][-1]),
-                "final_accuracy": float(history.history["accuracy"][-1]),
+                "environment": self.config.environment,
+                "batch_size": 256,
+                "epochs": 5,
+                "learning_rate": 1e-3,
+                "training_rows": len(ranking_df),
+                "user_count": len(artifacts.customer_to_idx),
+                "item_count": len(artifacts.article_to_idx),
             }
         )
 
@@ -166,16 +244,17 @@ class RankingTrainer:
             artifact_path="ranking_model",
         )
 
+        self.save_model_to_s3(model)
+
+        self.save_lookup_artifacts_to_s3(artifacts)
+
         tracker.end_run()
 
         return model
 
 
 def main():
-
-    trainer = RankingTrainer(
-        environment="test"
-    )
+    trainer = RankingTrainer(environment="prod")
 
     trainer.train()
 
