@@ -43,9 +43,35 @@ class ItemFeatureBuilder:
 
         # Join Embeddings
 
+        # Normalize item feature article ids
+        item_features = item_features.withColumn(
+            "article_id", F.lpad(F.col("article_id").cast("string"), 10, "0")
+        )
+
+        # Normalize embedding article ids
+        embeddings_clean = embeddings_clean.withColumn(
+            "article_id", F.lpad(F.col("article_id").cast("string"), 10, "0")
+        )
+
+        logger.info(
+            f"Item sample IDs: {item_features.select('article_id').limit(5).collect()}"
+        )
+
+        logger.info(
+            f"Embedding sample IDs: {embeddings_clean.select('article_id').limit(5).collect()}"
+        )
+
         final_df = item_features.join(embeddings_clean, on="article_id", how="left")
 
         # Embedding Availability Flag
+
+        logger.info(
+            f"Item article_id type: {item_features.schema['article_id'].dataType}"
+        )
+
+        logger.info(
+            f"Embedding article_id type: {embeddings_clean.schema['article_id'].dataType}"
+        )
 
         final_df = final_df.withColumn(
             "embedding_available",

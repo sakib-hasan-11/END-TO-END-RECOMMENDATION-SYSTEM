@@ -89,6 +89,10 @@ def main():
         config.validate()
         logger.info(f"Configuration validated - Output path: {config.output_root_path}")
 
+        logger.info(f"RANKING PATH = {config.ranking_input_path}")
+        logger.info(f"TWO TOWER PATH = {config.two_tower_input_path}")
+        logger.info(f"EMBEDDING PATH = {config.embeddings_input_path}")
+
         # Create Spark session
         spark = create_spark_session(logger)
 

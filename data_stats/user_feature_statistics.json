@@ -1,0 +1,145 @@
+{
+    "dataset_name": "user_features",
+    "row_count": 1233623,
+    "column_count": 9,
+    "numeric_features": {
+        "purchase_count": {
+            "count": 1233623,
+            "null_count": 0,
+            "min": 1,
+            "max": 1252,
+            "mean": 18.30817843052537,
+            "std": 29.03729008678088,
+            "p01": 1,
+            "p05": 1,
+            "p25": 3,
+            "p50": 8,
+            "p75": 22,
+            "p95": 70,
+            "p99": 139
+        },
+        "avg_spend": {
+            "count": 1233623,
+            "null_count": 0,
+            "min": 0.0007627118644067,
+            "max": 0.5067796610169492,
+            "mean": 0.029145641513225903,
+            "std": 0.014767920476574235,
+            "p01": 0.008457627118644,
+            "p05": 0.0135423728813559,
+            "p25": 0.02113075060532683,
+            "p50": 0.02650478997789237,
+            "p75": 0.0338813559322033,
+            "p95": 0.050830508474576215,
+            "p99": 0.084728813559322
+        },
+        "weekend_ratio": {
+            "count": 1233623,
+            "null_count": 0,
+            "min": 0.0,
+            "max": 1.0,
+            "mean": 0.29167913596265543,
+            "std": 0.339926143436223,
+            "p01": 0.0,
+            "p05": 0.0,
+            "p25": 0.0,
+            "p50": 0.17647058823529413,
+            "p75": 0.49074074074074076,
+            "p95": 1.0,
+            "p99": 1.0
+        },
+        "category_diversity": {
+            "count": 1233623,
+            "null_count": 0,
+            "min": 1,
+            "max": 12,
+            "mean": 3.42723830538179,
+            "std": 2.16437027205646,
+            "p01": 1,
+            "p05": 1,
+            "p25": 2,
+            "p50": 3,
+            "p75": 5,
+            "p95": 8,
+            "p99": 9
+        },
+        "preferred_channel": {
+            "count": 1233623,
+            "null_count": 0,
+            "min": 1,
+            "max": 2,
+            "mean": 1.664682808280974,
+            "std": 0.4721014227129298,
+            "p01": 1,
+            "p05": 1,
+            "p25": 1,
+            "p50": 2,
+            "p75": 2,
+            "p95": 2,
+            "p99": 2
+        },
+        "avg_purchase_gap_days": {
+            "count": 1090497,
+            "null_count": 143126,
+            "min": 0.0,
+            "max": 583.0,
+            "mean": 20.937357528206864,
+            "std": 36.56575647516254,
+            "p01": 0.0,
+            "p05": 0.0,
+            "p25": 0.0,
+            "p50": 11.0,
+            "p75": 24.789473684210527,
+            "p95": 75.33333333333333,
+            "p99": 175.5
+        }
+    },
+    "categorical_features": {
+        "customer_id": {
+            "unique_count": 1233623,
+            "top_values": {
+                "0000945f66de1a11d9447609b8b41b1bc987ba185a5496ae8831e8493afa24ff": 1,
+                "000197360fe727d2cc0887073db9062bf37a8949a95c4a63db58661d94d2cb06": 1,
+                "0004068f54dbe1c7054b23c615edc5f733a508ecc54930bf323209f20410898c": 1,
+                "0005340aa69bb5a28d98712a36d8f669024bce137e3c82a618ea49032b9023c6": 1,
+                "00005ca1c9ed5f5146b52ac8639a40ca9d57aeff4d1bd2c5feb1ca5dff07c43e": 1,
+                "000610a2daf19204bea9c8bf58dc30ed7d16948f46b266d0a420cc99e8658557": 1,
+                "000b6c6124d1c9fc9225e14b2e37461f15c9198a37ac94f30f2d658445075a13": 1,
+                "000773f3c485c18e103197e45a57021bc77acb16e39e0b9f362a9b5ef66878c3": 1,
+                "00007d2de826758b65a93dd24ce629ed66842531df6699338c5570910a014cc2": 1,
+                "0007887b812f214b9752d8b589503a35bdf1e27b66eec310c3f93378b4873d3d": 1
+            }
+        },
+        "favorite_category": {
+            "unique_count": 17,
+            "top_values": {
+                "garment upper body": 691575,
+                "garment lower body": 216460,
+                "garment full body": 85206,
+                "underwear": 81776,
+                "swimwear": 77344,
+                "accessories": 39681,
+                "shoes": 16644,
+                "socks & tights": 14446,
+                "nightwear": 9485,
+                "unknown": 671
+            }
+        },
+        "favorite_color": {
+            "unique_count": 50,
+            "top_values": {
+                "black": 765432,
+                "white": 94110,
+                "dark blue": 80023,
+                "light beige": 24294,
+                "blue": 23554,
+                "grey": 20521,
+                "light pink": 18824,
+                "red": 18764,
+                "light blue": 18164,
+                "dark red": 17785
+            }
+        }
+    },
+    "embedding_features": {}
+}

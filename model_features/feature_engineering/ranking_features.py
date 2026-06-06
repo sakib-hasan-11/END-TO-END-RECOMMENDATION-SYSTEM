@@ -22,6 +22,7 @@ class RankingFeatureBuilder:
             "article_id",
             "item_purchase_count",
             "avg_item_price",
+            # "unique_buyers",
             "days_since_last_sale",
             "embedding_available",
         )
@@ -42,6 +43,14 @@ class RankingFeatureBuilder:
 
         print("ITEM")
         print(item_features_df.columns)
+
+        interactions_df = interactions_df.withColumn(
+            "article_id", F.lpad(F.col("article_id").cast("string"), 10, "0")
+        )
+
+        item_features_df = item_features_df.withColumn(
+            "article_id", F.lpad(F.col("article_id").cast("string"), 10, "0")
+        )
 
         df = interactions_df.join(user_features_df, on="customer_id", how="inner").join(
             item_features_df, on="article_id", how="inner"
@@ -83,7 +92,7 @@ class RankingFeatureBuilder:
             "category_diversity",
             "avg_purchase_gap_days",
             "item_purchase_count",
-            "unique_buyers",
+            # "unique_buyers",
             "avg_item_price",
             "days_since_last_sale",
             "price_affinity",
