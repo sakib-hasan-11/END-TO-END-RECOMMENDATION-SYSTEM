@@ -4,11 +4,14 @@ import tempfile
 from pathlib import Path
 
 import boto3
+import pandas as pd
 
 os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
 import tensorflow as tf
 from configs import get_config
+from data.lookup_builder import LookupArtifacts
+from data.ranking_dataset import RankingDatasetBuilder
 from models.ranking_model import RankingModel
 
 from training.mlflow_tracker import MLflowTracker
@@ -21,76 +24,73 @@ class RankingTrainer:
     ):
         self.config = get_config(environment)
 
+        self.bucket = "recommendation-system-1149"
+
+        self.dataset_prefix = f"prepared_datasets/{self.config.environment}/ranking"
+
     def setup_device(self):
         gpus = tf.config.list_physical_devices("GPU")
 
         if gpus:
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(
-                    gpu,
-                    True,
-                )
+            try:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(
+                        gpu,
+                        True,
+                    )
 
-            print(f"Using GPU: {len(gpus)}")
+                print(f"Using GPU: {len(gpus)} detected")
 
-    def load_dataset(self):
-        bucket = "recommendation-system-1149"
+            except RuntimeError as e:
+                print(e)
 
-        prefix = f"prepared_datasets/{self.config.environment}/ranking"
+        else:
+            print("Using CPU")
 
+    def load_lookup_artifacts(
+        self,
+    ) -> LookupArtifacts:
         s3 = boto3.client("s3")
 
-        temp_dir = tempfile.TemporaryDirectory()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            local_file = Path(tmp_dir) / "lookup_artifacts.pkl"
 
-        local_dir = Path(temp_dir.name)
+            s3.download_file(
+                self.bucket,
+                f"{self.dataset_prefix}/lookup_artifacts.pkl",
+                str(local_file),
+            )
 
-        paginator = s3.get_paginator("list_objects_v2")
+            with open(
+                local_file,
+                "rb",
+            ) as f:
+                artifacts = pickle.load(f)
 
-        for page in paginator.paginate(
-            Bucket=bucket,
-            Prefix=f"{prefix}/dataset/",
-        ):
-            for obj in page.get(
-                "Contents",
-                [],
-            ):
-                key = obj["Key"]
+        return artifacts
 
-                relative = key.replace(
-                    f"{prefix}/dataset/",
-                    "",
-                )
+    def load_training_chunks(self):
+        s3 = boto3.client("s3")
 
-                target = local_dir / relative
-
-                target.parent.mkdir(
-                    parents=True,
-                    exist_ok=True,
-                )
-
-                s3.download_file(
-                    bucket,
-                    key,
-                    str(target),
-                )
-
-        dataset = tf.data.Dataset.load(str(local_dir))
-
-        artifact_file = local_dir / "lookup_artifacts.pkl"
-
-        s3.download_file(
-            bucket,
-            f"{prefix}/lookup_artifacts.pkl",
-            str(artifact_file),
+        response = s3.list_objects_v2(
+            Bucket=self.bucket,
+            Prefix=f"{self.dataset_prefix}/dataset",
         )
 
-        with open(
-            artifact_file,
-            "rb",
-        ) as f:
-            artifacts = pickle.load(f)
+        chunk_files = []
 
-        return dataset, artifacts
+        for obj in response.get(
+            "Contents",
+            [],
+        ):
+            key = obj["Key"]
+
+            if key.endswith(".parquet"):
+                chunk_files.append(key)
+
+        chunk_files.sort()
+
+        return chunk_files
 
     def build_model(self):
         return RankingModel()
@@ -99,8 +99,6 @@ class RankingTrainer:
         self,
         model,
     ):
-        bucket = "recommendation-system-1149"
-
         prefix = f"model_artifacts/{self.config.environment}/ranking"
 
         s3 = boto3.client("s3")
@@ -108,30 +106,44 @@ class RankingTrainer:
         with tempfile.TemporaryDirectory() as tmp_dir:
             keras_path = Path(tmp_dir) / "ranking_model.keras"
 
-            model.save(keras_path)
+            model.save(
+                keras_path,
+            )
 
             s3.upload_file(
                 str(keras_path),
-                bucket,
+                self.bucket,
                 f"{prefix}/ranking_model.keras",
             )
 
-            saved_model = Path(tmp_dir) / "saved_model"
+            saved_model_path = Path(tmp_dir) / "saved_model"
 
-            model.export(str(saved_model))
+            model.export(str(saved_model_path))
 
-            for file in saved_model.rglob("*"):
+            for file in saved_model_path.rglob("*"):
                 if file.is_file():
                     s3.upload_file(
                         str(file),
-                        bucket,
-                        f"{prefix}/saved_model/{file.relative_to(saved_model)}",
+                        self.bucket,
+                        f"{prefix}/saved_model/{file.relative_to(saved_model_path)}",
                     )
+
+        print(f"Model uploaded to s3://{self.bucket}/{prefix}")
 
     def train(self):
         self.setup_device()
 
-        dataset, artifacts = self.load_dataset()
+        print("Loading lookup artifacts...")
+
+        artifacts = self.load_lookup_artifacts()
+
+        print("Loading chunk list...")
+
+        chunk_files = self.load_training_chunks()
+
+        print(f"Found {len(chunk_files)} chunks")
+
+        ranking_builder = RankingDatasetBuilder(artifacts)
 
         model = self.build_model()
 
@@ -150,19 +162,42 @@ class RankingTrainer:
 
         tracker.start_run(run_name=f"{self.config.environment}_run")
 
-        history = model.fit(
-            dataset,
-            epochs=5,
-            verbose=1,
+        tracker.log_params(
+            {
+                "environment": self.config.environment,
+                "epochs": 5,
+                "learning_rate": 1e-3,
+                "chunk_count": len(chunk_files),
+            }
         )
 
-        tracker.log_metrics(
-            {
+        final_metrics = {}
+
+        for idx, chunk_key in enumerate(chunk_files):
+            print(f"\nTraining chunk {idx + 1}/{len(chunk_files)}")
+
+            df = pd.read_parquet(f"s3://{self.bucket}/{chunk_key}")
+
+            dataset = ranking_builder.build_tf_dataset(
+                df,
+                batch_size=256,
+            )
+
+            history = model.fit(
+                dataset,
+                epochs=5,
+                verbose=1,
+            )
+
+            final_metrics = {
                 "final_loss": float(history.history["loss"][-1]),
                 "final_auc": float(history.history["auc"][-1]),
                 "final_accuracy": float(history.history["accuracy"][-1]),
+                "final_precision": float(history.history["precision"][-1]),
+                "final_recall": float(history.history["recall"][-1]),
             }
-        )
+
+        tracker.log_metrics(final_metrics)
 
         tracker.log_tensorflow_model(
             model,
@@ -172,6 +207,8 @@ class RankingTrainer:
         self.save_model_to_s3(model)
 
         tracker.end_run()
+
+        return model
 
 
 def main():
@@ -184,4 +221,4 @@ if __name__ == "__main__":
     main()
 
 
-# python -m training.train_two_tower_from_dataset
+# python -m training.train_ranking_from_dataset

@@ -150,11 +150,6 @@ class RankingDatasetPreparer:
 
             print(f"Generated {len(ranking_df):,} ranking rows")
 
-            # dataset = ranking_builder.build_tf_dataset(
-            #     ranking_df,
-            #     batch_size=256,
-            # )
-
             self.save_dataset_chunk(
                 ranking_df=ranking_df,
                 chunk_id=chunk_id,

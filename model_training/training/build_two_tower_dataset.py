@@ -11,6 +11,7 @@ from configs import get_config
 from data.loaders import DataLoader
 from data.lookup_builder import LookupBuilder
 from data.tf_dataset import DatasetBuilder
+from data.two_tower_dataset_preparer import TwoTowerDatasetPreparer
 
 
 class TwoTowerDatasetBuilder:
@@ -111,7 +112,7 @@ class TwoTowerDatasetBuilder:
 
         self.save_lookup_artifacts(artifacts)
 
-        dataset_builder = DatasetBuilder(artifacts)
+        dataset_builder = TwoTowerDatasetPreparer(artifacts)
 
         interactions = self.loader.load_two_tower_interactions_streaming()
 
@@ -136,10 +137,12 @@ class TwoTowerDatasetBuilder:
 
             print(f"Loaded {len(interactions_df):,} interactions")
 
-            # dataset = dataset_builder.build_retrieval_dataset(
-            #     interactions_df,
-            #     batch_size=256,
-            # )
+            prepared_df = dataset_builder.build_training_dataframe(interactions_df)
+
+            self.save_dataset_chunk(
+                interactions_df=prepared_df,
+                chunk_id=chunk_id,
+            )
 
             self.save_dataset_chunk(
                 interactions_df=interactions_df,
@@ -147,7 +150,6 @@ class TwoTowerDatasetBuilder:
             )
 
             del interactions_df
-
 
             gc.collect()
 

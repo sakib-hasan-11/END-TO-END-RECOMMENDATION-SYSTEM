@@ -83,13 +83,6 @@ class RankingDatasetBuilder:
             random_state=42,
         ).reset_index(drop=True)
 
-        return ranking_df
-
-    def build_tf_dataset(
-        self,
-        ranking_df: pd.DataFrame,
-        batch_size: int = 256,
-    ):
         ranking_df["article_id"] = ranking_df["article_id"].astype(str).str.zfill(10)
 
         embeddings = ranking_df["article_id"].map(
@@ -100,9 +93,32 @@ class RankingDatasetBuilder:
 
         ranking_df = ranking_df.loc[valid_mask].reset_index(drop=True)
 
-        embeddings = embeddings.loc[valid_mask].reset_index(drop=True)
+        ranking_df["image_embedding"] = embeddings.loc[valid_mask].reset_index(
+            drop=True
+        )
 
-        image_embeddings = np.stack(embeddings.values).astype(np.float32)
+        ranking_df = ranking_df[
+            [
+                "purchase_count",
+                "avg_spend",
+                "item_purchase_count",
+                "unique_buyers",
+                "avg_item_price",
+                "image_embedding",
+                "label",
+            ]
+        ]
+
+        return ranking_df
+
+    def build_tf_dataset(
+        self,
+        ranking_df: pd.DataFrame,
+        batch_size: int = 256,
+    ):
+        image_embeddings = np.stack(ranking_df["image_embedding"].values).astype(
+            np.float32
+        )
 
         user_numeric = ranking_df[
             [
