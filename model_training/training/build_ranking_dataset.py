@@ -63,7 +63,7 @@ class RankingDatasetPreparer:
 
     def save_dataset_chunk(
         self,
-        dataset,
+        ranking_df,
         chunk_id,
     ):
         bucket = "recommendation-system-1149"
@@ -73,22 +73,20 @@ class RankingDatasetPreparer:
         s3 = boto3.client("s3")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            shard_path = Path(tmp_dir) / f"chunk_{chunk_id:05d}"
+            parquet_path = Path(tmp_dir) / f"ranking_chunk_{chunk_id:05d}.parquet"
 
-            tf.data.Dataset.save(
-                dataset,
-                str(shard_path),
+            ranking_df.to_parquet(
+                parquet_path,
+                index=False,
             )
+
             print(f"Uploading chunk {chunk_id:05d}")
-            for file in shard_path.rglob("*"):
-                if file.is_file():
-                    s3.upload_file(
-                        str(file),
-                        bucket,
-                        f"{prefix}/dataset/"
-                        f"chunk_{chunk_id:05d}/"
-                        f"{file.relative_to(shard_path)}",
-                    )
+
+            s3.upload_file(
+                str(parquet_path),
+                bucket,
+                f"{prefix}/dataset/ranking_chunk_{chunk_id:05d}.parquet",
+            )
 
     def build(self):
         print("Loading lookup source tables...")
@@ -130,7 +128,7 @@ class RankingDatasetPreparer:
         if self.config.environment == "test":
             chunk_size = 100000
         else:
-            chunk_size = 250000
+            chunk_size = 1000000
 
         # total_chunks = math.ceil(total_rows / chunk_size)
 
@@ -152,19 +150,18 @@ class RankingDatasetPreparer:
 
             print(f"Generated {len(ranking_df):,} ranking rows")
 
-            dataset = ranking_builder.build_tf_dataset(
-                ranking_df,
-                batch_size=256,
-            )
+            # dataset = ranking_builder.build_tf_dataset(
+            #     ranking_df,
+            #     batch_size=256,
+            # )
 
             self.save_dataset_chunk(
-                dataset=dataset,
+                ranking_df=ranking_df,
                 chunk_id=chunk_id,
             )
 
             del interactions_df
             del ranking_df
-            del dataset
 
             gc.collect()
 

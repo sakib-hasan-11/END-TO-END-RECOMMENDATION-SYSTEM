@@ -61,7 +61,7 @@ class TwoTowerDatasetBuilder:
 
     def save_dataset_chunk(
         self,
-        dataset,
+        interactions_df,
         chunk_id,
     ):
         bucket = "recommendation-system-1149"
@@ -71,22 +71,20 @@ class TwoTowerDatasetBuilder:
         s3 = boto3.client("s3")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            chunk_path = Path(tmp_dir) / f"chunk_{chunk_id:05d}"
+            parquet_path = Path(tmp_dir) / f"two_tower_chunk_{chunk_id:05d}.parquet"
 
-            tf.data.Dataset.save(
-                dataset,
-                str(chunk_path),
+            interactions_df.to_parquet(
+                parquet_path,
+                index=False,
             )
 
-            for file in chunk_path.rglob("*"):
-                if file.is_file():
-                    s3.upload_file(
-                        str(file),
-                        bucket,
-                        f"{prefix}/dataset/"
-                        f"chunk_{chunk_id:05d}/"
-                        f"{file.relative_to(chunk_path)}",
-                    )
+            print(f"Uploading chunk {chunk_id:05d}")
+
+            s3.upload_file(
+                str(parquet_path),
+                bucket,
+                f"{prefix}/dataset/two-tower_chunk_{chunk_id:05d}.parquet",
+            )
 
     def build(self):
         print("Loading lookup source tables...")
@@ -123,7 +121,7 @@ class TwoTowerDatasetBuilder:
         if self.config.environment == "test":
             chunk_size = 100000
         else:
-            chunk_size = 1000000
+            chunk_size = 5000000
 
         # total_chunks = math.ceil(total_rows / chunk_size)
 
@@ -138,18 +136,18 @@ class TwoTowerDatasetBuilder:
 
             print(f"Loaded {len(interactions_df):,} interactions")
 
-            dataset = dataset_builder.build_retrieval_dataset(
-                interactions_df,
-                batch_size=256,
-            )
+            # dataset = dataset_builder.build_retrieval_dataset(
+            #     interactions_df,
+            #     batch_size=256,
+            # )
 
             self.save_dataset_chunk(
-                dataset=dataset,
+                interactions_df=interactions_df,
                 chunk_id=chunk_id,
             )
 
             del interactions_df
-            del dataset
+
 
             gc.collect()
 
