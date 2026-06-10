@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+import pyarrow.dataset as ds
+
 # import s3fs
 import pyarrow.fs as pafs
 
@@ -79,24 +81,17 @@ class S3Reader:
 
         return table
 
-    # def count_rows(self, path: str) -> int:
-    #     """
-    #     Count rows in a parquet dataset without converting to pandas.
-    #     """
+    def read_dataset_streaming(
+        self,
+        path: str,
+        columns=None,
+    ):
+        path = self._normalize_path(path)
 
-    #     dataset = ds.dataset(
-    #         path,
-    #         format="parquet",
-    #         filesystem=self.fs,
-    #     )
+        dataset = ds.dataset(
+            path,
+            filesystem=self.fs,
+            format="parquet",
+        )
 
-    #     return dataset.count_rows()
-
-    # def list_files(self, path: str) -> List[str]:
-    #     """
-    #     List parquet files under a prefix.
-    #     """
-
-    # files = self.fs.glob(f"{path}/**/*.parquet")
-
-    # return sorted(files)
+        return dataset
