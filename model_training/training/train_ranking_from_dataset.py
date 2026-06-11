@@ -161,7 +161,7 @@ class RankingTrainer:
             ],
         )
 
-        tracker = MLflowTracker(experiment_name="ranking_model")
+        tracker = MLflowTracker(experiment_name="ranking_model_v1")
 
         tracker.start_run(run_name=f"{self.config.environment}_run")
 
