@@ -68,7 +68,9 @@ class TwoTowerTrainer:
 
         return artifacts
 
-    def load_training_chunks(self):
+    def load_training_chunks(
+        self,
+    ):
         s3 = boto3.client("s3")
 
         response = s3.list_objects_v2(
@@ -76,16 +78,14 @@ class TwoTowerTrainer:
             Prefix=f"{self.dataset_prefix}/dataset",
         )
 
-        chunk_files = []
-
-        for obj in response.get(
-            "Contents",
-            [],
-        ):
-            key = obj["Key"]
-
-            if key.endswith(".parquet"):
-                chunk_files.append(key)
+        chunk_files = [
+            obj["Key"]
+            for obj in response.get(
+                "Contents",
+                [],
+            )
+            if obj["Key"].endswith(".parquet")
+        ]
 
         chunk_files.sort()
 
@@ -148,9 +148,13 @@ class TwoTowerTrainer:
 
         print(f"Found {len(chunk_files)} chunks")
 
+        dataset_builder = DatasetBuilder(artifacts)
+
         model = self.build_model(artifacts)
 
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3))
+
+        num_epochs = 5
 
         tracker = MLflowTracker(experiment_name="two_tower_retrieval")
 
@@ -159,33 +163,39 @@ class TwoTowerTrainer:
         tracker.log_params(
             {
                 "environment": self.config.environment,
-                "epochs": 5,
+                "epochs": num_epochs,
                 "learning_rate": 1e-3,
                 "chunk_count": len(chunk_files),
             }
         )
 
-        dataset_builder = DatasetBuilder(artifacts)
-
         final_loss = None
 
-        for idx, chunk_key in enumerate(chunk_files):
-            print(f"\nTraining chunk {idx + 1}/{len(chunk_files)}")
+        for epoch in range(num_epochs):
+            print(f"\n{'=' * 60}")
+            print(f"Epoch {epoch + 1}/{num_epochs}")
+            print(f"{'=' * 60}")
 
-            df = pd.read_parquet(f"s3://{self.bucket}/{chunk_key}")
+            for idx, chunk_key in enumerate(chunk_files):
+                print(f"\nTraining chunk {idx + 1}/{len(chunk_files)}")
 
-            dataset = dataset_builder.build_retrieval_dataset(
-                df,
-                batch_size=256,
-            )
+                df = pd.read_parquet(f"s3://{self.bucket}/{chunk_key}")
 
-            history = model.fit(
-                dataset,
-                epochs=5,
-                verbose=1,
-            )
+                dataset = dataset_builder.build_retrieval_dataset(
+                    df,
+                    batch_size=256,
+                )
 
-            final_loss = float(history.history["loss"][-1])
+                history = model.fit(
+                    dataset,
+                    epochs=1,
+                    verbose=1,
+                )
+
+                final_loss = float(history.history["loss"][-1])
+
+                del df
+                del dataset
 
         tracker.log_metrics(
             {
