@@ -104,36 +104,42 @@ class TwoTowerTrainer:
         self,
         model,
     ):
-        s3 = boto3.client("s3")
-
         prefix = f"model_artifacts/{self.config.environment}/two_tower"
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            keras_path = Path(tmp_dir) / "two_tower_model.keras"
+        s3 = boto3.client("s3")
 
-            model.save(
-                keras_path,
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dummy_features = {
+                "user_numeric": tf.zeros((1, 2), dtype=tf.float32),
+                "user_category": tf.constant(["unknown"]),
+                "user_color": tf.constant(["unknown"]),
+                "item_numeric": tf.zeros((1, 3), dtype=tf.float32),
+                "image_embedding": tf.zeros((1, 512), dtype=tf.float32),
+            }
+
+            _ = model.user_model(dummy_features)
+            _ = model.item_model(dummy_features)
+
+            user_weights = Path(tmp_dir) / "user_tower.weights.h5"
+            item_weights = Path(tmp_dir) / "item_tower.weights.h5"
+
+            model.user_model.save_weights(str(user_weights))
+
+            model.item_model.save_weights(str(item_weights))
+
+            s3.upload_file(
+                str(user_weights),
+                self.bucket,
+                f"{prefix}/user_tower.weights.h5",
             )
 
             s3.upload_file(
-                str(keras_path),
+                str(item_weights),
                 self.bucket,
-                f"{prefix}/two_tower_model.keras",
+                f"{prefix}/item_tower.weights.h5",
             )
 
-            saved_model_path = Path(tmp_dir) / "saved_model"
-
-            model.export(str(saved_model_path))
-
-            for file in saved_model_path.rglob("*"):
-                if file.is_file():
-                    s3.upload_file(
-                        str(file),
-                        self.bucket,
-                        f"{prefix}/saved_model/{file.relative_to(saved_model_path)}",
-                    )
-
-        print(f"Model uploaded to s3://{self.bucket}/{prefix}")
+        print(f"Weights uploaded to s3://{self.bucket}/{prefix}")
 
     def train(self):
         self.setup_device()
@@ -154,9 +160,9 @@ class TwoTowerTrainer:
 
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3))
 
-        num_epochs = 5
+        num_epochs = 1
 
-        tracker = MLflowTracker(experiment_name="two_tower_retrieval")
+        tracker = MLflowTracker(experiment_name="two_tower_retrieval_test_2")
 
         tracker.start_run(run_name=f"{self.config.environment}_run")
 
@@ -203,10 +209,10 @@ class TwoTowerTrainer:
             }
         )
 
-        tracker.log_tensorflow_model(
-            model,
-            artifact_path="two_tower_model",
-        )
+        # tracker.log_tensorflow_model(
+        #     model,
+        #     artifact_path="two_tower_model",
+        # )
 
         self.save_model_to_s3(model)
 
@@ -216,9 +222,11 @@ class TwoTowerTrainer:
 
 
 def main():
-    trainer = TwoTowerTrainer(environment="prod")
+    trainer = TwoTowerTrainer(environment="test")
 
     trainer.train()
+
+    print("pipeline complited and model trained")
 
 
 if __name__ == "__main__":

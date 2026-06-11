@@ -11,6 +11,10 @@ class UserTower(tf.keras.Model):
     ):
         super().__init__()
 
+        self.category_vocab = category_vocab
+        self.color_vocab = color_vocab
+        self.embedding_dim = embedding_dim
+
         self.category_lookup = tf.keras.layers.StringLookup(
             vocabulary=category_vocab,
             mask_token=None,
@@ -33,12 +37,18 @@ class UserTower(tf.keras.Model):
 
         self.dense = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(128, activation="relu"),
+                tf.keras.layers.Dense(
+                    128,
+                    activation="relu",
+                ),
                 tf.keras.layers.Dense(64),
             ]
         )
 
-    def call(self, inputs):
+    def call(
+        self,
+        inputs,
+    ):
         numeric = inputs["user_numeric"]
 
         category = self.category_embedding(
@@ -58,6 +68,13 @@ class UserTower(tf.keras.Model):
 
         return self.dense(x)
 
+    def get_config(self):
+        return {
+            "category_vocab": self.category_vocab,
+            "color_vocab": self.color_vocab,
+            "embedding_dim": self.embedding_dim,
+        }
+
 
 class ItemTower(tf.keras.Model):
     def __init__(self):
@@ -73,7 +90,10 @@ class ItemTower(tf.keras.Model):
             ]
         )
 
-    def call(self, inputs):
+    def call(
+        self,
+        inputs,
+    ):
         x = tf.concat(
             [
                 inputs["item_numeric"],
@@ -84,6 +104,9 @@ class ItemTower(tf.keras.Model):
 
         return self.dense(x)
 
+    def get_config(self):
+        return {}
+
 
 class TwoTowerModel(tfrs.models.Model):
     def __init__(
@@ -92,6 +115,9 @@ class TwoTowerModel(tfrs.models.Model):
         color_vocab,
     ):
         super().__init__()
+
+        self.category_vocab = category_vocab
+        self.color_vocab = color_vocab
 
         self.user_model = UserTower(
             category_vocab=category_vocab,
@@ -115,3 +141,16 @@ class TwoTowerModel(tfrs.models.Model):
             user_embeddings,
             item_embeddings,
         )
+
+    def get_config(self):
+        return {
+            "category_vocab": self.category_vocab,
+            "color_vocab": self.color_vocab,
+        }
+
+    @classmethod
+    def from_config(
+        cls,
+        config,
+    ):
+        return cls(**config)
