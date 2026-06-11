@@ -24,6 +24,8 @@ class LookupArtifacts:
 
     favorite_category_vocab: List[str]
     favorite_color_vocab: List[str]
+    valid_ranking_articles: list
+    item_feature_lookup: Dict[str,dict]
 
 
 class LookupBuilder:
@@ -68,6 +70,11 @@ class LookupBuilder:
 
         aligned_embedding_table = aligned_embedding_table.sort_by("article_id")
 
+        return (
+            aligned_item_table,
+            aligned_embedding_table,
+        )
+
         def build_embedding_lookup(
             self,
             embedding_table: pa.Table,
@@ -87,10 +94,54 @@ class LookupBuilder:
                 )
             }
 
-        return (
-            aligned_item_table,
-            aligned_embedding_table,
-        )
+        def build_item_feature_lookup(
+            self,
+            item_table,
+        ):
+
+            article_ids = [
+                str(x).zfill(10)
+                for x in item_table
+                .column("article_id")
+                .to_pylist()
+            ]
+
+            purchase_count = (
+                item_table
+                .column("item_purchase_count")
+                .to_pylist()
+            )
+
+            unique_buyers = (
+                item_table
+                .column("unique_buyers")
+                .to_pylist()
+            )
+
+            avg_price = (
+                item_table
+                .column("avg_item_price")
+                .to_pylist()
+            )
+
+            return {
+                article_id: {
+                    "item_purchase_count": pc,
+                    "unique_buyers": ub,
+                    "avg_item_price": ap,
+                }
+                for article_id, pc, ub, ap
+                in zip(
+                    article_ids,
+                    purchase_count,
+                    unique_buyers,
+                    avg_price,
+                )
+            }
+
+
+
+
 
     def build_user_lookup(
         self,
@@ -106,7 +157,10 @@ class LookupBuilder:
     ) -> Dict[str, int]:
         article_ids = item_table.column("article_id").to_pylist()
 
-        return {article_id: idx for idx, article_id in enumerate(article_ids)}
+        return {
+            str(article_id).zfill(10): idx
+            for idx, article_id in enumerate(article_ids)
+        }
 
     def build_user_feature_matrix(
         self,
@@ -205,11 +259,60 @@ class LookupBuilder:
 
         return sorted(list(set(values)))
 
+    def build_item_feature_lookup(
+        self,
+        item_table,
+    ):
+        article_ids = [
+            str(x).zfill(10)
+            for x in item_table.column("article_id").to_pylist()
+        ]
+
+        item_purchase_count = (
+            item_table
+            .column("item_purchase_count")
+            .fill_null(0)
+            .to_pylist()
+        )
+
+        unique_buyers = (
+            item_table
+            .column("unique_buyers")
+            .fill_null(0)
+            .to_pylist()
+        )
+
+        avg_item_price = (
+            item_table
+            .column("avg_item_price")
+            .fill_null(0)
+            .to_pylist()
+        )
+
+        return {
+            article_id: {
+                "item_purchase_count": purchase_count,
+                "unique_buyers": buyers,
+                "avg_item_price": price,
+            }
+            for article_id, purchase_count, buyers, price in zip(
+                article_ids,
+                item_purchase_count,
+                unique_buyers,
+                avg_item_price,
+            )
+    }
+
     def build_embedding_lookup(
         self,
         embedding_table: pa.Table,
     ) -> Dict[str, np.ndarray]:
-        article_ids = embedding_table.column("article_id").to_pylist()
+        article_ids = [
+            str(x).zfill(10)
+            for x in embedding_table
+            .column("article_id")
+            .to_pylist()
+        ]
 
         embeddings = embedding_table.column("image_embedding").to_pylist()
 
@@ -235,6 +338,15 @@ class LookupBuilder:
             embedding_table,
         )
 
+        valid_ranking_articles = list(
+            {
+                str(article_id).zfill(10)
+                for article_id in item_table
+                .column("article_id")
+                .to_pylist()
+            }
+        )
+
         return LookupArtifacts(
             customer_to_idx=self.build_user_lookup(user_table),
             article_to_idx=self.build_item_lookup(item_table),
@@ -245,4 +357,6 @@ class LookupBuilder:
             article_embedding_lookup=self.build_embedding_lookup(embedding_table),
             favorite_category_vocab=self.build_user_category_vocab(user_table),
             favorite_color_vocab=self.build_user_color_vocab(user_table),
+            item_feature_lookup=self.build_item_feature_lookup(item_table),
+            valid_ranking_articles=valid_ranking_articles
         )

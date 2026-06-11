@@ -17,7 +17,7 @@ class RankingDatasetBuilder:
         interactions_df: pd.DataFrame,
         negative_ratio: int = 3,
     ) -> pd.DataFrame:
-        all_articles = list(self.artifacts.article_to_idx.keys())
+        all_articles = self.artifacts.valid_ranking_articles
 
         negatives = []
 
@@ -65,9 +65,75 @@ class RankingDatasetBuilder:
     ):
         positives = self.create_positive_samples(interactions_df)
 
+        positives["article_id"] = positives["article_id"].astype(str).str.zfill(10)
+
         negatives = self.create_negative_samples(
             interactions_df,
             negative_ratio,
+        )
+
+        # feature_cols = [
+        #     "purchase_count",
+        #     "avg_spend",
+        #     "item_purchase_count",
+        #     "unique_buyers",
+        #     "avg_item_price",
+        # ]
+
+        user_features = interactions_df[
+            [
+                "customer_id",
+                "purchase_count",
+                "avg_spend",
+            ]
+        ].drop_duplicates("customer_id")
+
+        # item_features = (
+        #     interactions_df[
+        #         [
+        #             "article_id",
+        #             "item_purchase_count",
+        #             "unique_buyers",
+        #             "avg_item_price",
+        #         ]
+        #     ]
+        #     .drop_duplicates("article_id")
+        # )
+
+        # item_features["article_id"] = (
+        #     item_features["article_id"]
+        #     .astype(str)
+        #     .str.zfill(10)
+        # )
+
+        item_feature_records = negatives["article_id"].map(
+            self.artifacts.item_feature_lookup
+        )
+
+        negatives["article_id"] = negatives["article_id"].astype(str).str.zfill(10)
+
+        negatives = negatives.merge(
+            user_features,
+            on="customer_id",
+            how="left",
+        )
+
+        # negatives = negatives.merge(
+        #     item_features,
+        #     on="article_id",
+        #     how="left",
+        # )
+
+        negatives["item_purchase_count"] = item_feature_records.apply(
+            lambda x: x["item_purchase_count"] if x is not None else 0.0
+        )
+
+        negatives["unique_buyers"] = item_feature_records.apply(
+            lambda x: x["unique_buyers"] if x is not None else 0.0
+        )
+
+        negatives["avg_item_price"] = item_feature_records.apply(
+            lambda x: x["avg_item_price"] if x is not None else 0.0
         )
 
         ranking_df = pd.concat(
@@ -108,6 +174,22 @@ class RankingDatasetBuilder:
                 "label",
             ]
         ]
+
+        print(
+            ranking_df[
+                [
+                    "purchase_count",
+                    "avg_spend",
+                    "item_purchase_count",
+                    "unique_buyers",
+                    "avg_item_price",
+                    "image_embedding",
+                    "label",
+                ]
+            ]
+            .isna()
+            .sum()
+        )
 
         return ranking_df
 

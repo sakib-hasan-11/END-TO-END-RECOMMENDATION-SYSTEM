@@ -148,6 +148,20 @@ class RankingDatasetPreparer:
                 negative_ratio=3,
             )
 
+            print(
+                ranking_df[
+                    [
+                        "purchase_count",
+                        "avg_spend",
+                        "item_purchase_count",
+                        "unique_buyers",
+                        "avg_item_price",
+                    ]
+                ]
+                .isna()
+                .sum()
+            )
+
             print(f"Generated {len(ranking_df):,} ranking rows")
 
             self.save_dataset_chunk(

@@ -20,7 +20,7 @@ class TwoTowerDatasetPreparer:
 
         df["customer_idx"] = df["customer_id"].map(self.artifacts.customer_to_idx)
 
-        embedding_lookup = self.artifacts.embedding_lookup
+        embedding_lookup = self.artifacts.article_embedding_lookup
 
         df["image_embedding"] = df["article_id"].map(embedding_lookup)
 
